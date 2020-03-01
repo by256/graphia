@@ -36,7 +36,7 @@ class SpectralGraphConv(nn.Module):
 
 class GAT(nn.Module):
     """
-    Petar Velickovic's et al. Graph Attention layer from (https://arxiv.org/abs/1710.10903).
+    Petar Veličković's et al. Graph Attention layer from (https://arxiv.org/abs/1710.10903).
 
     Args:
         in_features (int): Number of features in each node of the input node feature matrix.
@@ -77,7 +77,7 @@ class GAT(nn.Module):
 
 class MultiHeadGAT(nn.Module):
     """
-    Petar Velickovic's et al. Graph Attention layer from (https://arxiv.org/abs/1710.10903).
+    Petar Veličković's et al. Graph Attention layer from (https://arxiv.org/abs/1710.10903).
 
     Args:
         in_features (int): Number of features in each node of the input node feature matrix.
