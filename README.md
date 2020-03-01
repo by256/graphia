@@ -1,5 +1,5 @@
 # graphia
-Personal library of graph neural network implementations in PyTorch.
+Library of graph neural network implementations in PyTorch.
 
 GNN Layers:
 - Graph Convolutional Network (GCN) - [Kipf and Welling](https://arxiv.org/abs/1609.02907)
