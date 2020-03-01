@@ -26,7 +26,7 @@ class UVvis(Dataset):
         node_features, node_mask = self.get_atomic_features(rd_mol)
         A = self.get_adjacency_matrix(rd_mol)
 
-        output = torch.Tensor(A), torch.Tensor(node_features), torch.Tensor(node_mask), torch.Tensor([comp])
+        output = torch.Tensor(A), torch.Tensor(node_features), torch.Tensor(node_mask), torch.Tensor([comp])#.squeeze()
         return output
 
     def get_adjacency_matrix(self, molecule):

@@ -18,22 +18,14 @@ class DiffPool(nn.Module):
         self.embedding_gnn = embedding_gnn
         self.pooling_gnn = pooling_gnn
         self.softmax = nn.Softmax(dim=2)
+        self.relu = nn.ReLU()
 
     def forward(self, A, embedding_gnn_inputs, pooling_gnn_inputs):
         z = self.embedding_gnn(*embedding_gnn_inputs)
-        # print('z', z.shape)
+        z = self.relu(z)
         s = self.softmax(self.pooling_gnn(*pooling_gnn_inputs))
-        print('s', s.shape)
-        print(s[0, 0, :])
-        
         s_T = torch.transpose(s, dim0=1, dim1=2)
-        # print('s_T', s_T.shape)
 
-        A = torch.matmul(s_T, torch.matmul(A, s))
-        
-        x = torch.matmul(s_T, z)
-        print('new A', A.shape)
-        # print('new x', x.shape)
-        print(A[0])
-        print('\n\n')
+        A = torch.matmul(s_T, torch.matmul(A, s))  # A_new = S_TAs        
+        x = torch.matmul(s_T, z)  # x_new = s_Tz
         return A, x
