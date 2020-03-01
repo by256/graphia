@@ -3,7 +3,9 @@ import torch.nn as nn
 
 
 class GlobalMaxPooling(nn.Module):
-
+    """
+    Global max pooling layer. Computes the node-wise maximum over the node feature matrix of a graph.
+    """
     def __init__(self):
         super(GlobalMaxPooling, self).__init__()
     
@@ -12,7 +14,21 @@ class GlobalMaxPooling(nn.Module):
 
 
 class DiffPool(nn.Module):
+    """
+    Ying et al. Hierarchical Graph Representation Learning with Differentiable Pooling (DiffPool) 
+    pooling layer from (https://arxiv.org/abs/1806.08804).
+    
+    POTENTIALLY BROKEN CURRENTLY.
 
+    Args:
+        embedding_gnn: GNN layer for embedding layer within DiffPool.
+        pooling_gnn: GNN layer for pooling layer within DiffPool.
+
+    Attributes:
+        softmax: Softmax activation function.
+        relu: ReLU activation function
+
+    """
     def __init__(self, embedding_gnn, pooling_gnn):
         super(DiffPool, self).__init__()
         self.embedding_gnn = embedding_gnn
@@ -21,11 +37,10 @@ class DiffPool(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, A, embedding_gnn_inputs, pooling_gnn_inputs):
-        z = self.embedding_gnn(*embedding_gnn_inputs)
-        z = self.relu(z)
+        z = self.relu(self.embedding_gnn(*embedding_gnn_inputs))
         s = self.softmax(self.pooling_gnn(*pooling_gnn_inputs))
         s_T = torch.transpose(s, dim0=1, dim1=2)
 
-        A = torch.matmul(s_T, torch.matmul(A, s))  # A_new = S_TAs        
-        x = torch.matmul(s_T, z)  # x_new = s_Tz
+        A = torch.matmul(s_T, torch.matmul(A, s))
+        x = torch.matmul(s_T, z)
         return A, x

@@ -200,16 +200,83 @@ def get_uvvis_dataloaders(batch_size=4):
     val_loader = DataLoader(val_uvvis, batch_size=batch_size)
     return train_uvvis, val_uvvis, train_loader, val_loader
 
-def test_GAT():
-    train_uvvis, val_uvvis, train_loader, val_loader = get_uvvis_dataloaders(batch_size=4)
-    
-    gat = MultiHeadGAT(121, 64, multihead_agg='efwefw')
 
-    for (A, x, mask, y) in train_loader:
-        print('x', x.shape)
-        out = gat(A, x)
-        print('out', out.shape)
-        break
+class ToyGATModel(nn.Module):
+    
+    def __init__(self):
+        super(ToyGATModel, self).__init__()
+        self.gat1 = MultiHeadGAT(in_features=121, head_out_features=64)
+        self.gat2 = MultiHeadGAT(in_features=192, head_out_features=64)
+        self.gat3 = MultiHeadGAT(in_features=192, head_out_features=64, multihead_agg='average')
+        self.pooling = GlobalMaxPooling()
+        self.linear = nn.Linear(64, 1)
+        self.relu = nn.ReLU()
+
+    def forward(self, A, x, masks):
+        x = self.relu(self.gat1(A, x))
+        x = self.relu(self.gat2(A, x))
+        x = self.relu(self.gat3(A, x))
+
+        x = self.pooling(x)
+        x = self.linear(x)
+        return x
+
+
+def test_GAT():
+
+    n_train = 4096
+    n_val = 256
+    
+    train_uvvis = UVvis(masked=True)
+    train_uvvis.df = train_uvvis.df.iloc[:n_train, :]
+    mu, sigma = np.mean(train_uvvis.df['computational']), np.std(train_uvvis.df['computational'])
+    train_uvvis.df['computational'] = (train_uvvis.df['computational'] - mu) / sigma
+
+    val_uvvis = UVvis(masked=True)
+    val_uvvis.df = val_uvvis.df.iloc[n_train:n_train+n_val, :]
+    val_uvvis.df['computational'] = (val_uvvis.df['computational'] - mu) / sigma
+
+    train_loader = DataLoader(train_uvvis, batch_size=64)
+    val_loader = DataLoader(val_uvvis, batch_size=64)
+    
+    model = ToyGATModel()
+
+    optimizer = optim.Adam(model.parameters())
+    MSE = nn.MSELoss()
+
+    print(model, '\n')
+
+    for epoch in range(256):
+        train_losses = []
+        train_metrics = []
+        model.train()
+        for idx, (A, x, masks, y_true) in enumerate(train_loader):
+            # print('y_true', y_true.shape)
+            optimizer.zero_grad()
+            y_pred = model(A, x, masks)
+            loss = MSE(y_true, y_pred)
+            y_pred = (y_pred * sigma) + mu
+            y_true = (y_true * sigma) + mu
+            train_losses.append(loss.item())
+            train_metrics.append(nn.L1Loss()(y_true, y_pred).item())
+            loss.backward()
+            optimizer.step()
+        #     break
+        # break
+
+        val_losses = []
+        val_metrics = []
+        model.eval()
+        for idx, (A, x, masks, y_true) in enumerate(val_loader):
+            y_pred = model(A, x, masks)
+            y_pred = (y_pred * sigma) + mu
+            y_true = (y_true * sigma) + mu
+            val_losses.append(MSE(y_true, y_pred).item())
+            val_metrics.append(nn.L1Loss()(y_true, y_pred).item())
+        
+        print('Epoch: {}    Loss: {:.4f}    Train MAE: {:.4f}    Val Loss: {:.4f}    Val MAE: {:.4f}'.format(epoch+1, np.mean(train_losses), np.mean(train_metrics), np.mean(val_losses), np.mean(val_metrics)))
+
+
 
     
 
