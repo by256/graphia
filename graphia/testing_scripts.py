@@ -1,12 +1,14 @@
 import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from datasets import UVvis
-from pooling import GlobalMaxPooling, DiffPool
-from layers import SpectralGraphConv, GAT, MultiHeadGAT
+from pooling import GlobalMaxPooling, GlobalSumPooling, DiffPool
+from layers import SpectralGraphConv, GAT, MultiHeadGAT, GIN
 
 
 
@@ -277,10 +279,84 @@ def test_GAT():
         print('Epoch: {}    Loss: {:.4f}    Train MAE: {:.4f}    Val Loss: {:.4f}    Val MAE: {:.4f}'.format(epoch+1, np.mean(train_losses), np.mean(train_metrics), np.mean(val_losses), np.mean(val_metrics)))
 
 
+class ToyGINModel(nn.Module):
+    
+    def __init__(self):
+        super(ToyGINModel, self).__init__()
+        self.gin1 = GIN(in_features=121, out_features=64)
+        self.gin2 = GIN(in_features=64, out_features=64)
+        self.gin3 = GIN(in_features=64, out_features=64)
+        self.pooling = GlobalSumPooling()
+        self.linear = nn.Linear(64, 1)
+        self.relu = nn.ReLU()
+
+    def forward(self, A, x, masks):
+        x = self.relu(self.gin1(A, x))
+        x = x * masks[:, :, :x.shape[-1]]
+        x = self.relu(self.gin2(A, x))
+        x = x * masks[:, :, :x.shape[-1]]
+        x = self.relu(self.gin3(A, x))
+        x = x * masks[:, :, :x.shape[-1]]
+
+        x = self.pooling(x)
+        x = self.linear(x)
+        return x
+
+
+def test_GIN():
+
+    n_train = 4096
+    n_val = 256
+    
+    train_uvvis = UVvis(masked=True)
+    train_uvvis.df = train_uvvis.df.iloc[:n_train, :]
+    mu, sigma = np.mean(train_uvvis.df['computational']), np.std(train_uvvis.df['computational'])
+    train_uvvis.df['computational'] = (train_uvvis.df['computational'] - mu) / sigma
+
+    val_uvvis = UVvis(masked=True)
+    val_uvvis.df = val_uvvis.df.iloc[n_train:n_train+n_val, :]
+    val_uvvis.df['computational'] = (val_uvvis.df['computational'] - mu) / sigma
+
+    train_loader = DataLoader(train_uvvis, batch_size=4)
+    val_loader = DataLoader(val_uvvis, batch_size=4)
+
+    model = ToyGINModel()
+    optimizer = optim.Adam(model.parameters())
+    MSE = nn.MSELoss()
+
+    print(model, '\n')
+
+    for epoch in range(256):
+        train_losses = []
+        train_metrics = []
+        model.train()
+        for idx, (A, x, masks, y_true) in enumerate(train_loader):
+            optimizer.zero_grad()
+            y_pred = model(A, x, masks)
+            loss = MSE(y_true, y_pred)
+            y_pred = (y_pred * sigma) + mu
+            y_true = (y_true * sigma) + mu
+            train_losses.append(loss.item())
+            train_metrics.append(nn.L1Loss()(y_true, y_pred).item())
+            loss.backward()
+            optimizer.step()
+        #     break
+        # break
+
+        val_losses = []
+        val_metrics = []
+        model.eval()
+        for idx, (A, x, masks, y_true) in enumerate(val_loader):
+            y_pred = model(A, x, masks)
+            y_pred = (y_pred * sigma) + mu
+            y_true = (y_true * sigma) + mu
+            val_losses.append(MSE(y_true, y_pred).item())
+            val_metrics.append(nn.L1Loss()(y_true, y_pred).item())
+        
+        print('Epoch: {}    Loss: {:.4f}    Train MAE: {:.4f}    Val Loss: {:.4f}    Val MAE: {:.4f}'.format(epoch+1, np.mean(train_losses), np.mean(train_metrics), np.mean(val_losses), np.mean(val_metrics)))
+
 
     
 
-    
 
-
-test_GAT()
+test_GIN()

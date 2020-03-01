@@ -36,7 +36,7 @@ class SpectralGraphConv(nn.Module):
 
 class GAT(nn.Module):
     """
-    Petar Veličković's et al. Graph Attention layer from (https://arxiv.org/abs/1710.10903).
+    Petar Veličković et al. Graph Attention layer from (https://arxiv.org/abs/1710.10903).
 
     Args:
         in_features (int): Number of features in each node of the input node feature matrix.
@@ -47,7 +47,7 @@ class GAT(nn.Module):
             W: learnable weight parameter of the transformation.
             b: learnable bias parameter of the transformation.
             attention_mechanism: single feedforward attention transformation layer.
-            leaky_relu: LeakyReLU activation.
+            leaky_relu: torch.nn.LeakyReLU activation.
     """
     def __init__(self, in_features, out_features, bias=True):
         super(GAT, self).__init__()
@@ -90,7 +90,7 @@ class MultiHeadGAT(nn.Module):
             W: learnable weight parameter of the transformation.
             b: learnable bias parameter of the transformation.
             attention_mechanism: single feedforward attention transformation layer.
-            leaky_relu: LeakyReLU activation.
+            leaky_relu: torch.nn.LeakyReLU activation.
     """
     def __init__(self, in_features, head_out_features, n_heads=3, multihead_agg='concat'):
         super(MultiHeadGAT, self).__init__()
@@ -117,3 +117,25 @@ class MultiHeadGAT(nn.Module):
         
         return h
 
+
+class GIN(nn.Module):
+    """
+    Xu and Hu et al. Graph Isomorphism Network from (https://arxiv.org/abs/1810.00826).
+    
+    Args:
+        in_features (int): Number of features in each node of the input node feature matrix.
+        out_features (int): Number of features in each node of the output node feature matrix.
+    
+    Attributes:
+        epsilon (torch.nn.Parameter): learnable epsilon parameter.
+        mlp (torch.nn.Linear): transformation function for aggregated node feature matrix.
+    """
+    def __init__(self, in_features, out_features):
+        super(GIN, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.epsilon = torch.nn.Parameter(torch.zeros(1), requires_grad=True)
+        self.mlp = nn.Linear(self.in_features, self.out_features)
+
+    def forward(self, A, x):
+        return self.mlp((1 + self.epsilon)*x + torch.matmul(A, x))

@@ -13,6 +13,17 @@ class GlobalMaxPooling(nn.Module):
         return torch.max(x, dim=1)[0]
 
 
+class GlobalSumPooling(nn.Module):
+    """
+    Global sum pooling layer. Computes the node-wise summation over the node feature matrix of a graph.
+    """
+    def __init__(self):
+        super(GlobalSumPooling, self).__init__()
+    
+    def forward(self, x):
+        return torch.sum(x, dim=1)
+
+
 class DiffPool(nn.Module):
     """
     Ying et al. Hierarchical Graph Representation Learning with Differentiable Pooling (DiffPool) 
@@ -25,8 +36,8 @@ class DiffPool(nn.Module):
         pooling_gnn: GNN layer for pooling layer within DiffPool.
 
     Attributes:
-        softmax: Softmax activation function.
-        relu: ReLU activation function
+        softmax: torch.nn.Softmax activation function.
+        relu: torch.nn.ReLU activation function
 
     """
     def __init__(self, embedding_gnn, pooling_gnn):
