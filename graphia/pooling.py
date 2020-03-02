@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from utils import normalize_A
+
 
 class GlobalMaxPooling(nn.Module):
     """
@@ -90,7 +92,16 @@ class DiffPool(nn.Module):
 
 class MinCutPooling(nn.Module):
     """
-    (Bianchi and Grattarola et al., 2019)'s minCUT pooling from (https://arxiv.org/abs/1907.00481).
+    (Bianchi and Grattarola et al., 2019)'s minCUT pooling layer from (https://arxiv.org/abs/1907.00481).
+    
+    Args:
+        in_features (int): Number of features in each node of the input node feature matrix.
+        hidden_features (int): Number of features in each node of the hidden node feature matrix.
+        n_clusters (int): Number of clusters in the coarsened adjacency matrix
+
+    Attributes:
+        W_1 (torch.nn.Parameter): Trainable weight matrix.
+        W_2 (torch.nn.Parameter): Trainable weight matrix.
     """
     def __init__(self, in_features, hidden_features, n_clusters):
         super(MinCutPooling, self).__init__()
@@ -103,22 +114,14 @@ class MinCutPooling(nn.Module):
         self.W_2 = torch.nn.Parameter(torch.randn(self.hidden_features, self.n_clusters), requires_grad=True)
         nn.init.xavier_normal_(self.W_2.data)
 
-
-
-    def forward(self, A, D, x):
+    def forward(self, A, x):
         S = F.softmax(torch.matmul(F.relu(torch.matmul(x, self.W_1)), self.W_2), dim=2).squeeze(1)
-        print('S', S.shape)
         S_T = torch.transpose(S, dim0=1, dim1=2)
-
-        
         A_pool = torch.matmul(S_T, torch.matmul(A, S))
-
         A_pool = A_pool - torch.eye(A_pool.shape[-1])*A_pool
-        D_power = D**(-0.5)
-        D_power[D_power > 1e12] = 0.0
-        print(D_power)
-        A_pool = torch.matmul(D_power, torch.matmul(A_pool, D_power))
-        print(A_pool)
-
-        # A_pool = torch.matmul(S, torch.matmul(A, S))
+        A_pool = normalize_A(A_pool)
         X_pool = torch.matmul(S_T, x)
+        return A_pool, X_pool
+
+    def unsupervised_loss(self):
+        raise NotImplementedError

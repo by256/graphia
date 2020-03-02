@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
-# from rdkit import Chem
-# from rdkit.Chem import rdmolops
+from rdkit import Chem
+from rdkit.Chem import rdmolops
 
 import torch
 from torch.utils.data import Dataset

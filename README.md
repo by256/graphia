@@ -10,8 +10,9 @@ GNN Layers:
 - Convolutional ARMA Filters (ARMAConv) - [Bianchi et al., 2019](https://arxiv.org/abs/1901.01343)
 
 Pooling:
-- Global Sum/Max Pooling
+- Global Sum/Ave/Max Pooling
 - DiffPool - [Ying et al., 2019](https://arxiv.org/abs/1806.08804)
+- MinCut Pooling - [Bianchi and Grattarola et al., 2019](https://arxiv.org/abs/1907.00481)
 
 ## Example Usage
 
