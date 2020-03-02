@@ -18,7 +18,7 @@ Pooling:
 To use graphia's GNN layers, simply import the layers you want to use and define a PyTorch model as you usually would. Below is an example of a graph neural network that maps an input graph with node dimensions $N \times 32$ to a scalar real-valued output.
 
 ```python
-import torch.nn
+import torch.nn as nn
 from graphia.layers import GIN # Graph Isomorphism Network layer
 from graphia.pooling import GlobalSumPooling
 
