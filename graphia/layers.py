@@ -6,7 +6,7 @@ import torch.nn.functional as F
 class SpectralGraphConv(nn.Module):
     def __init__(self, in_features, out_features, bias=True):
         """
-        Kipf and Welling's graph convolution layer from (https://arxiv.org/abs/1609.02907).
+        (Kipf and Welling, 2017)'s graph convolution layer from (https://arxiv.org/abs/1609.02907).
 
         Args:
             in_features (int): Number of features in each node of the input node feature matrix.
@@ -36,7 +36,7 @@ class SpectralGraphConv(nn.Module):
 
 class GAT(nn.Module):
     """
-    Petar Veličković et al. Graph Attention layer from (https://arxiv.org/abs/1710.10903).
+    (Petar Veličković's et al., 2018)'s Graph Attention layer from (https://arxiv.org/abs/1710.10903).
 
     Args:
         in_features (int): Number of features in each node of the input node feature matrix.
@@ -75,7 +75,7 @@ class GAT(nn.Module):
 
 class MultiHeadGAT(nn.Module):
     """
-    Petar Veličković's et al. Multi-Head Graph Attention layer from (https://arxiv.org/abs/1710.10903).
+    (Petar Veličković's et al., 2018)'s Multi-Head Graph Attention layer from (https://arxiv.org/abs/1710.10903).
 
     Args:
         in_features (int): Number of features in each node of the input node feature matrix.
@@ -113,7 +113,7 @@ class MultiHeadGAT(nn.Module):
 
 class GIN(nn.Module):
     """
-    Xu and Hu et al. Graph Isomorphism Network from (https://arxiv.org/abs/1810.00826).
+    (Xu and Hu et al., 2019)'s Graph Isomorphism Network from (https://arxiv.org/abs/1810.00826).
     
     Args:
         in_features (int): Number of features in each node of the input node feature matrix.
@@ -178,7 +178,7 @@ class ARMAConvGCSLayer(nn.Module):
 
 class ARMAConv(nn.Module):
     """
-    (Bianchi et al., 2019) Convolutional ARMA Filter from (https://arxiv.org/abs/1901.01343).
+    (Bianchi et al., 2019)'s Convolutional ARMA Filter from (https://arxiv.org/abs/1901.01343).
 
     Args:
         in_features (int): Number of features in each node of the input node feature matrix.

@@ -4,9 +4,10 @@ Library of graph neural network implementations in PyTorch.
 ## Features
 
 GNN Layers:
-- Graph Convolutional Network (GCN) - [Kipf and Welling](https://arxiv.org/abs/1609.02907)
-- Graph Attention Network (GAT) - [Veličković et al.](https://arxiv.org/abs/1710.10903)
-- Graph Isomorphism Network (GIN) - [Xu and Hu et al.](https://arxiv.org/abs/1810.00826)
+- Graph Convolutional Network (GCN) - [Kipf and Welling, 2017](https://arxiv.org/abs/1609.02907)
+- Graph Attention Network (GAT) - [Veličković et al., 2018](https://arxiv.org/abs/1710.10903)
+- Graph Isomorphism Network (GIN) - [Xu and Hu et al., 2019](https://arxiv.org/abs/1810.00826)
+- Convolutional ARMA Filters (ARMAConv) - [Bianchi et al., 2019](https://arxiv.org/abs/1901.01343)
 
 Pooling:
 - Global Sum/Max Pooling
