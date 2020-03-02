@@ -27,7 +27,7 @@ from graphia.pooling import GlobalSumPooling
 class GNNRegressor(nn.Module):
 
     def __init__(self):
-        super(GraphNeuralNetwork, self).__init___()
+        super(GNNRegressor, self).__init___()
         self.graph_layer_1 = GIN(in_features=32, out_features=32)
         self.graph_layer_2 = GIN(in_features=32, out_features=16)
         self.pooling = GlobalSumPooling()
