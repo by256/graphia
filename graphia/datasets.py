@@ -110,9 +110,9 @@ class Cora(Dataset):
     """
     Adapted from (https://github.com/tkipf/pygcn/blob/master/pygcn/utils.py)
     """
-    def __init__(self, path='../datasets/cora/', laplacian=True):
+    def __init__(self, path='../datasets/cora/', norm=True):
         self.path = path
-        self.laplacian = laplacian
+        self.norm = norm
         self.adj, self.features, self.labels, self.idx_train, self.idx_val, self.idx_test = self.build_graph()
 
     def build_graph(self):
@@ -134,7 +134,10 @@ class Cora(Dataset):
         adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
 
         features = self.normalize(features)
-        adj = self.normalize(adj + sp.eye(adj.shape[0]))
+        if self.norm:
+            adj = self.normalize(adj + sp.eye(adj.shape[0]))
+        else:
+            adj + sp.eye(adj.shape[0])
 
         idx_train = range(140)
         idx_val = range(200, 500)

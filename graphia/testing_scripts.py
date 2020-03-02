@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from datasets import Cora#, UVvis
-from pooling import GlobalMaxPooling, GlobalSumPooling, DiffPool
+from pooling import GlobalMaxPooling, GlobalSumPooling, DiffPool, MinCutPooling
 from layers import SpectralGraphConv, GAT, MultiHeadGAT, GIN, ARMAConv
 
 
@@ -431,4 +431,21 @@ def test_cora():
         print('Epoch: {}    Loss: {:.4f}    Train Accuracy: {:.4f}    Val Loss: {:.4f}    Val Accuracy: {:.4f}'.format(epoch+1, np.mean(train_losses), np.mean(train_metrics), np.mean(val_losses), np.mean(val_metrics)))
 
 
-test_cora()
+def test_mincut():
+
+    cora = Cora(norm=False)
+    A = cora.adj.to_dense().unsqueeze_(0)
+    D = torch.diag(A.squeeze().sum(dim=-1))
+    x = cora.features.unsqueeze_(0)
+    print('A', A.shape)
+    print('D', D.shape)
+    print('x', x.shape)
+    print(D)
+    x = cora.features.unsqueeze_(0)
+
+    mincut = MinCutPooling(1433, 64, 64)
+
+    out = mincut(A, D, x)
+
+
+test_mincut()
