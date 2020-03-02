@@ -11,7 +11,7 @@ GNN Layers:
 
 Pooling:
 - Global Sum/Max Pooling
-- DiffPool - [Ying et al.](https://arxiv.org/abs/1806.08804)
+- DiffPool - [Ying et al., 2019](https://arxiv.org/abs/1806.08804)
 
 ## Example Usage
 
