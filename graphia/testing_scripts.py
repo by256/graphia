@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 
 from datasets import Cora#, UVvis
 from pooling import GlobalMaxPooling, GlobalSumPooling, DiffPool
-from layers import SpectralGraphConv, GAT, MultiHeadGAT, GIN
+from layers import SpectralGraphConv, GAT, MultiHeadGAT, GIN, ARMAConv
 
 
 
@@ -360,16 +360,26 @@ class ToyGINCoraModel(nn.Module):
     
     def __init__(self):
         super(ToyGINCoraModel, self).__init__()
-        self.gin1 = GIN(in_features=1433, out_features=64)
-        self.gin2 = GIN(in_features=64, out_features=64)
-        self.gin3 = GIN(in_features=64, out_features=7)
+        # self.gc1 = GIN(in_features=1433, out_features=64)
+        # self.gc2 = GIN(in_features=64, out_features=64)
+        # self.gc3 = GIN(in_features=64, out_features=7)
+        # self.gc1 = SpectralGraphConv(in_features=1433, out_features=64)
+        # self.gc2 = SpectralGraphConv(in_features=64, out_features=64)
+        # self.gc3 = SpectralGraphConv(in_features=64, out_features=7)
+        # self.gc1 = GAT(in_features=1433, out_features=64)
+        # self.gc2 = GAT(in_features=64, out_features=64)
+        # self.gc3 = GAT(in_features=64, out_features=7)
+        self.gc1 = ARMAConv(in_features=1433, out_features=64, timesteps=3)
+        self.gc2 = ARMAConv(in_features=64, out_features=64, timesteps=3)
+        self.gc3 = ARMAConv(in_features=64, out_features=7, timesteps=3)
+
 
         self.relu = nn.ReLU()
 
     def forward(self, A, x):
-        x = self.relu(self.gin1(A, x))
-        x = self.relu(self.gin2(A, x))
-        x = F.log_softmax(self.gin3(A, x), dim=2)
+        x = self.relu(self.gc1(A, x))
+        x = self.relu(self.gc2(A, x))
+        x = F.log_softmax(self.gc3(A, x), dim=2)
         return x
 
 
@@ -388,9 +398,6 @@ def test_cora():
     idx_train = cora.idx_train
     idx_val = cora.idx_val
 
-    print(np.unique(labels))
-
-
     print('A', A.shape)
     print('X', x.shape)
     print('labels', labels.shape)
@@ -399,7 +406,7 @@ def test_cora():
     optimizer = optim.Adam(model.parameters())
     nll = nn.NLLLoss()
 
-    for epoch in range(100):
+    for epoch in range(400):
         train_losses = []
         train_metrics = []
         model.train()
@@ -422,8 +429,6 @@ def test_cora():
         val_metrics.append(accuracy(y_pred[idx_val], labels[idx_val]).item())
         
         print('Epoch: {}    Loss: {:.4f}    Train Accuracy: {:.4f}    Val Loss: {:.4f}    Val Accuracy: {:.4f}'.format(epoch+1, np.mean(train_losses), np.mean(train_metrics), np.mean(val_losses), np.mean(val_metrics)))
-
-
 
 
 test_cora()

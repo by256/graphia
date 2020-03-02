@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class SpectralGraphConv(nn.Module):
@@ -24,8 +25,7 @@ class SpectralGraphConv(nn.Module):
         self.W = torch.nn.Parameter(torch.randn(self.in_features, self.out_features), requires_grad=True)
         nn.init.xavier_normal_(self.W.data)
         if self.bias:
-            self.b = torch.nn.Parameter(torch.randn(self.out_features, ), requires_grad=True)
-            nn.init.xavier_normal_(self.b.data)
+            self.b = torch.nn.Parameter(torch.zeros(self.out_features, ), requires_grad=True)
 
     def forward(self, A, x):
         z = torch.matmul(A, torch.matmul(x, self.W)) 
@@ -75,7 +75,7 @@ class GAT(nn.Module):
 
 class MultiHeadGAT(nn.Module):
     """
-    Petar Veličković's et al. Graph Attention layer from (https://arxiv.org/abs/1710.10903).
+    Petar Veličković's et al. Multi-Head Graph Attention layer from (https://arxiv.org/abs/1710.10903).
 
     Args:
         in_features (int): Number of features in each node of the input node feature matrix.
@@ -138,11 +138,26 @@ class ARMAConvGCSLayer(nn.Module):
     """
     Graph Convolutional Skip (GCS) layer, which makes up a single element of the stack of GCS
     layers in an ARMAConv layer.
+
+    Args:
+        in_features (int): Number of features in each node of the input node feature matrix.
+        out_features (int): Number of features in each node of the output node feature matrix.
+        timesteps (int): number of recursive updates.
+            Default: 1
+        activation: torch.nn activation function used in each recursive update.
+            Default: ``nn.ReLU()``
+
+    Attributes:
+        V_t (torch.nn.Parameter): Trainable parameter for input feature transformation.
+        W_1 (torch.nn.Parameter): Trainable parameter for first iteration.
+        W_t (torch.nn.Parameter): Trainable parameter for t-th iteration.
     """
-    def __init__(self, in_features, out_features, timesteps=1):
+    def __init__(self, in_features, out_features, timesteps=1, activation=nn.ReLU()):
+        super(ARMAConvGCSLayer, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.timesteps = timesteps
+        self.activation = activation
 
         self.V_t = torch.nn.Parameter(torch.randn(self.in_features, self.out_features), requires_grad=True)
         nn.init.xavier_normal_(self.V_t.data)
@@ -154,24 +169,37 @@ class ARMAConvGCSLayer(nn.Module):
 
 
     def forward(self, L, x):
-        X_out = torch.matmul(x, self.V_t) # initialise as XV_t
+        x_t = x
         for i in range(1, self.timesteps+1):
             W_t = getattr(self, 'W_{}'.format(i))
-            X_tW_t = torch.matmul(x, W_t)
-            LX_tW_t = torch.matmul(L, X_tW_t)
-            X_out += LX_tW_t
-        return X_out
+            x_t = self.activation(torch.matmul(L, torch.matmul(x_t, W_t)) + torch.matmul(x, self.V_t))
+        return x_t
 
 
 class ARMAConv(nn.Module):
     """
-    Bianchi et al. Convolutional ARMA Filter from (https://arxiv.org/abs/1901.01343).
+    (Bianchi et al., 2019) Convolutional ARMA Filter from (https://arxiv.org/abs/1901.01343).
+
+    Args:
+        in_features (int): Number of features in each node of the input node feature matrix.
+        out_features (int): Number of features in each node of the output node feature matrix.
+        timesteps (int): Number of recursive updates.
+            Default: 1
+        k (int): Number of parallel stacks.
+            Default: 3
+        dropout_p (float): Dropout probability.
+            Default: 0.2
+    
+    Attributes:
+        GCS_k (ARMAConvGCSLayer): GCS layer of the k-th stack in the ARMAConv layer.
     """
-    def __init__(self, in_features, out_features, timesteps=1, k=3):
+    def __init__(self, in_features, out_features, timesteps=1, k=3, dropout_p=0.2):
+        super(ARMAConv, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.timesteps = timesteps
         self.k = k
+        self.dropout_p = dropout_p
 
         for i in range(1, self.k+1):
             setattr(self, 'GCS_{}'.format(i), ARMAConvGCSLayer(self.in_features, self.out_features, self.timesteps))
@@ -181,5 +209,5 @@ class ARMAConv(nn.Module):
         X_out = torch.zeros(B, N, self.out_features)
         for i in range(1, self.k+1):
             gcs_layer = getattr(self, 'GCS_{}'.format(i))
-            X_out += F.dropout(gcs_layer(L, x), p=0.5)
+            X_out += F.dropout(gcs_layer(L, x), p=0.2)
         return X_out / self.k
