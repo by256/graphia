@@ -1,6 +1,8 @@
 # graphia
 Library of graph neural network implementations in PyTorch.
 
+## Features
+
 GNN Layers:
 - Graph Convolutional Network (GCN) - [Kipf and Welling](https://arxiv.org/abs/1609.02907)
 - Graph Attention Network (GAT) - [Veličković et al.](https://arxiv.org/abs/1710.10903)
