@@ -24,7 +24,7 @@ from graphia.layers import GIN # Graph Isomorphism Network layer
 from graphia.pooling import GlobalSumPooling
 
 
-class GraphNeuralNetwork(nn.Module):
+class GNNRegressor(nn.Module):
 
     def __init__(self):
         super(GraphNeuralNetwork, self).__init___()
