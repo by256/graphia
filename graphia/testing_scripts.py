@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from datasets import UVvis
+from utils import laplacian
 from pooling import GlobalMaxPooling, GlobalSumPooling, DiffPool
 from layers import SpectralGraphConv, GAT, MultiHeadGAT, GIN
 
@@ -356,7 +357,26 @@ def test_GIN():
         print('Epoch: {}    Loss: {:.4f}    Train MAE: {:.4f}    Val Loss: {:.4f}    Val MAE: {:.4f}'.format(epoch+1, np.mean(train_losses), np.mean(train_metrics), np.mean(val_losses), np.mean(val_metrics)))
 
 
+def test_laplacian():
+    n_train = 1
     
+    train_uvvis = UVvis(masked=True)
+    train_uvvis.df = train_uvvis.df.iloc[:n_train, :]
+
+    train_loader = DataLoader(train_uvvis, batch_size=4)
+
+    for idx, (A, x, masks, y_true) in enumerate(train_loader):
+        L = laplacian(A)
+        L_normed = laplacian(A, norm=True)
+        A = A[0].detach().numpy()
+        print('A', A.shape)
+        fig, axes = plt.subplots(1, 3)
+        axes[0].imshow(A)
+        axes[1].imshow(L[0])
+        axes[2].imshow(L_normed[0])
+        plt.show()
+        break
 
 
-test_GIN()
+
+test_laplacian()

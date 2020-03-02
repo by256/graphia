@@ -4,24 +4,54 @@ import torch.nn as nn
 
 class GlobalMaxPooling(nn.Module):
     """
-    Global max pooling layer. Computes the node-wise maximum over the node feature matrix of a graph.
+    Global max pooling layer. 
+    Computes the node-wise maximum over the node feature matrix of a graph.
     """
-    def __init__(self):
+    def __init__(self, dim=1):
         super(GlobalMaxPooling, self).__init__()
+        self.dim = dim
     
     def forward(self, x):
-        return torch.max(x, dim=1)[0]
+        return torch.max(x, dim=self.dim)[0]
 
 
 class GlobalSumPooling(nn.Module):
     """
-    Global sum pooling layer. Computes the node-wise summation over the node feature matrix of a graph.
+    Global sum pooling layer. 
+    Computes the node-wise summation over the node feature matrix of a graph.
     """
-    def __init__(self):
+    def __init__(self, dim=1):
         super(GlobalSumPooling, self).__init__()
+        self.dim = dim
     
     def forward(self, x):
-        return torch.sum(x, dim=1)
+        return torch.sum(x, dim=self.dim)
+
+
+class GlobalAvePooling(nn.Module):
+    """
+    Global average pooling layer. 
+    Computes the node-wise average over the node feature matrix of a graph.
+    """
+    def __init__(self, dim=1):
+        super(GlobalAvePooling, self).__init__()
+        self.dim = dim
+    
+    def forward(self, x):
+        return torch.mean(x, dim=self.dim)
+
+
+class MaskedAvePooling(nn.Module):
+    """
+    Masked average pooling layer. 
+    Computes the node-wise average over the node feature matrix for nodes specified by a mask.
+    """
+    def __init__(self, dim=1):
+        super(GlobalAvePooling, self).__init__()
+        self.dim = dim
+    
+    def forward(self, x):
+        raise NotImplementedError
 
 
 class DiffPool(nn.Module):

@@ -47,7 +47,6 @@ class GAT(nn.Module):
             W: learnable weight parameter of the transformation.
             b: learnable bias parameter of the transformation.
             attention_mechanism: single feedforward attention transformation layer.
-            leaky_relu: torch.nn.LeakyReLU activation.
     """
     def __init__(self, in_features, out_features, bias=True):
         super(GAT, self).__init__()
@@ -58,13 +57,12 @@ class GAT(nn.Module):
         self.W = torch.nn.Parameter(torch.randn(self.in_features, self.out_features), requires_grad=True)
         nn.init.xavier_normal_(self.W.data)
         self.attention_mechanism = nn.Linear(2*self.out_features, 1, bias=self.bias)
-        self.leaky_relu = nn.LeakyReLU(negative_slope=0.2)
 
     def forward(self, A, x):
         Wh = torch.matmul(x, self.W)  # B x N x F_prime
         B, N = x.shape[0], x.shape[1]
         Wh_concat = torch.cat([Wh.view(B, N, 1, -1).repeat(1, 1, N, 1), Wh.view(B, 1, N, -1).repeat(1, N, 1, 1)], dim=-1)  # B x N x N x 2F_prime
-        a = self.leaky_relu(self.attention_mechanism(Wh_concat)).squeeze()
+        a = F.leaky_relu(self.attention_mechanism(Wh_concat), negative_slope=0.2).squeeze()
         a = self.masked_softmax(a, A, dim=1)
         return torch.matmul(a, Wh)
 
@@ -86,11 +84,6 @@ class MultiHeadGAT(nn.Module):
             Default: 3
         multihead_agg (string): ``'concat'`` or ``'average'``. Aggregation function.
             Default: ``'concat'``
-    Attributes:
-            W: learnable weight parameter of the transformation.
-            b: learnable bias parameter of the transformation.
-            attention_mechanism: single feedforward attention transformation layer.
-            leaky_relu: torch.nn.LeakyReLU activation.
     """
     def __init__(self, in_features, head_out_features, n_heads=3, multihead_agg='concat'):
         super(MultiHeadGAT, self).__init__()
@@ -139,3 +132,54 @@ class GIN(nn.Module):
 
     def forward(self, A, x):
         return self.mlp((1 + self.epsilon)*x + torch.matmul(A, x))
+
+
+class ARMAConvGCSLayer(nn.Module):
+    """
+    Graph Convolutional Skip (GCS) layer, which makes up a single element of the stack of GCS
+    layers in an ARMAConv layer.
+    """
+    def __init__(self, in_features, out_features, timesteps=1):
+        self.in_features = in_features
+        self.out_features = out_features
+        self.timesteps = timesteps
+
+        self.V_t = torch.nn.Parameter(torch.randn(self.in_features, self.out_features), requires_grad=True)
+        nn.init.xavier_normal_(self.V_t.data)
+        self.W_1 = torch.nn.Parameter(torch.randn(self.in_features, self.out_features), requires_grad=True)
+        nn.init.xavier_normal_(self.W_1.data)
+        if self.timesteps > 1:
+            for i in range(2, self.timesteps+1):
+                setattr(self, 'W_{}'.format(i), torch.nn.Parameter(torch.randn(self.out_features, self.out_features), requires_grad=True))
+
+
+    def forward(self, L, x):
+        X_out = torch.matmul(x, self.V_t) # initialise as XV_t
+        for i in range(1, self.timesteps+1):
+            W_t = getattr(self, 'W_{}'.format(i))
+            X_tW_t = torch.matmul(x, W_t)
+            LX_tW_t = torch.matmul(L, X_tW_t)
+            X_out += LX_tW_t
+        return X_out
+
+
+class ARMAConv(nn.Module):
+    """
+    Bianchi et al. Convolutional ARMA Filter from (https://arxiv.org/abs/1901.01343).
+    """
+    def __init__(self, in_features, out_features, timesteps=1, k=3):
+        self.in_features = in_features
+        self.out_features = out_features
+        self.timesteps = timesteps
+        self.k = k
+
+        for i in range(1, self.k+1):
+            setattr(self, 'GCS_{}'.format(i), ARMAConvGCSLayer(self.in_features, self.out_features, self.timesteps))
+
+    def forward(self, L, x):
+        B, N = x.shape[0], x.shape[1]
+        X_out = torch.zeros(B, N, self.out_features)
+        for i in range(1, self.k+1):
+            gcs_layer = getattr(self, 'GCS_{}'.format(i))
+            X_out += F.dropout(gcs_layer(L, x), p=0.5)
+        return X_out / self.k
