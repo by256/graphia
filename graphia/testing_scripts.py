@@ -6,8 +6,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-from datasets import UVvis
-from utils import laplacian
+from datasets import Cora#, UVvis
 from pooling import GlobalMaxPooling, GlobalSumPooling, DiffPool
 from layers import SpectralGraphConv, GAT, MultiHeadGAT, GIN
 
@@ -357,26 +356,74 @@ def test_GIN():
         print('Epoch: {}    Loss: {:.4f}    Train MAE: {:.4f}    Val Loss: {:.4f}    Val MAE: {:.4f}'.format(epoch+1, np.mean(train_losses), np.mean(train_metrics), np.mean(val_losses), np.mean(val_metrics)))
 
 
-def test_laplacian():
-    n_train = 1
+class ToyGINCoraModel(nn.Module):
     
-    train_uvvis = UVvis(masked=True)
-    train_uvvis.df = train_uvvis.df.iloc[:n_train, :]
+    def __init__(self):
+        super(ToyGINCoraModel, self).__init__()
+        self.gin1 = GIN(in_features=1433, out_features=64)
+        self.gin2 = GIN(in_features=64, out_features=64)
+        self.gin3 = GIN(in_features=64, out_features=7)
 
-    train_loader = DataLoader(train_uvvis, batch_size=4)
+        self.relu = nn.ReLU()
 
-    for idx, (A, x, masks, y_true) in enumerate(train_loader):
-        L = laplacian(A)
-        L_normed = laplacian(A, norm=True)
-        A = A[0].detach().numpy()
-        print('A', A.shape)
-        fig, axes = plt.subplots(1, 3)
-        axes[0].imshow(A)
-        axes[1].imshow(L[0])
-        axes[2].imshow(L_normed[0])
-        plt.show()
-        break
+    def forward(self, A, x):
+        x = self.relu(self.gin1(A, x))
+        x = self.relu(self.gin2(A, x))
+        x = F.log_softmax(self.gin3(A, x), dim=2)
+        return x
 
 
+def accuracy(output, labels):
+    preds = output.max(1)[1].type_as(labels)
+    correct = preds.eq(labels).double()
+    correct = correct.sum()
+    return correct / len(labels)
 
-test_laplacian()
+
+def test_cora():
+    cora = Cora()
+    A = cora.adj.to_dense().unsqueeze_(0)
+    x = cora.features.unsqueeze_(0)
+    labels = cora.labels#.unsqueeze_(0)
+    idx_train = cora.idx_train
+    idx_val = cora.idx_val
+
+    print(np.unique(labels))
+
+
+    print('A', A.shape)
+    print('X', x.shape)
+    print('labels', labels.shape)
+
+    model = ToyGINCoraModel()
+    optimizer = optim.Adam(model.parameters())
+    nll = nn.NLLLoss()
+
+    for epoch in range(100):
+        train_losses = []
+        train_metrics = []
+        model.train()
+        
+        optimizer.zero_grad()
+        y_pred = model(A, x).squeeze()
+        loss = nll(y_pred[idx_train, :], labels[idx_train])
+        train_losses.append(loss.item())
+        train_metrics.append(accuracy(y_pred[idx_train], labels[idx_train]).item())
+        loss.backward()
+        optimizer.step()
+
+
+        val_losses = []
+        val_metrics = []
+        model.eval()
+
+        y_pred = model(A, x).squeeze()
+        val_losses.append(nll(y_pred[idx_val, :], labels[idx_val]).item())
+        val_metrics.append(accuracy(y_pred[idx_val], labels[idx_val]).item())
+        
+        print('Epoch: {}    Loss: {:.4f}    Train Accuracy: {:.4f}    Val Loss: {:.4f}    Val Accuracy: {:.4f}'.format(epoch+1, np.mean(train_losses), np.mean(train_metrics), np.mean(val_losses), np.mean(val_metrics)))
+
+
+
+
+test_cora()
