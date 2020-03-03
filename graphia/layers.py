@@ -211,3 +211,69 @@ class ARMAConv(nn.Module):
             gcs_layer = getattr(self, 'GCS_{}'.format(i))
             X_out += F.dropout(gcs_layer(L, x), p=0.2)
         return X_out / self.k
+
+
+class GatedGraphConv(nn.Module):
+    """
+    (Bresson and Laurent, 2018)'s Gated Graph Convolution layer from (https://arxiv.org/abs/1711.07553).
+
+    Args:
+        in_features (int): Number of features in each node of the input node feature matrix.
+        out_features (int): Number of features in each node of the output node feature matrix.
+
+    Attributes:
+        U (torch.nn.Parameter): Trainable parameter for input feature transformation.
+        V (torch.nn.Parameter): Trainable parameter for input feature transformation.
+        A (torch.nn.Parameter): Trainable parameter for edge gate transformation.
+        B (torch.nn.Parameter): Trainable parameter for edge gate transformation.
+    """
+    def __init__(self, in_features, out_features):
+        super(GatedGraphConv, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+
+        # Graph-conv params
+        self.U = torch.nn.Parameter(torch.randn(self.in_features, self.out_features), requires_grad=True)
+        nn.init.xavier_normal_(self.U.data)
+        self.V = torch.nn.Parameter(torch.randn(self.in_features, self.out_features), requires_grad=True)
+        nn.init.xavier_normal_(self.V.data)
+        # Edge-gate params
+        self.A = torch.nn.Parameter(torch.randn(self.in_features, self.out_features), requires_grad=True)
+        nn.init.xavier_normal_(self.A.data)
+        self.B = torch.nn.Parameter(torch.randn(self.in_features, self.out_features), requires_grad=True)
+        nn.init.xavier_normal_(self.B.data)
+
+    def forward(self, A, x):
+        B, N = x.shape[0], x.shape[1]
+        h_i = x.view(B, N, 1, -1).repeat(1, 1, N, 1)
+        h_j = x.view(B, 1, N, -1).repeat(1, N, 1, 1)
+
+        Ah_i = torch.matmul(h_i, self.A)
+        Bh_j = torch.matmul(h_j, self.B)
+        edge_gates = torch.sigmoid(Ah_i + Bh_j) * A.unsqueeze(-1)
+
+        edge_gated_nbrs = torch.sum(edge_gates*torch.matmul(h_j, self.V), dim=2)
+        return torch.matmul(x, self.U) + edge_gated_nbrs
+
+
+class GraphSAGE(nn.Module):
+    """
+    (Hamilton and Ying et al., 2018)'s GraphSAGE layer from (https://arxiv.org/abs/1706.02216).
+
+    Args:
+        in_features (int): Number of features in each node of the input node feature matrix.
+        out_features (int): Number of features in each node of the output node feature matrix.
+
+    Attributes:
+        linear (torch.nn.Linear): Fully connected dense transformation layer.
+    """
+    def __init__(self, in_features, out_features):
+        super(GraphSAGE, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.linear = nn.Linear(2*self.in_features, self.out_features)
+
+    def forward(self, A, x):
+        mean_aggregate = torch.matmul(A, x) / (torch.sum(A, dim=-1, keepdim=True) + 1e-6)
+        h = torch.cat([x, mean_aggregate], dim=-1)
+        return self.linear(h)

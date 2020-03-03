@@ -8,8 +8,8 @@ from torch.utils.data import DataLoader
 
 from utils import degree_matrix
 from datasets import Cora, UVvis
-from pooling import GlobalMaxPooling, GlobalSumPooling, DiffPool, MinCutPooling
-from layers import SpectralGraphConv, GAT, MultiHeadGAT, GIN, ARMAConv
+from pooling import GlobalMaxPooling, GlobalSumPooling, GlobalAvePooling, DiffPool, MinCutPooling
+from layers import SpectralGraphConv, GAT, MultiHeadGAT, GIN, ARMAConv, GatedGraphConv, GraphSAGE
 
 
 
@@ -525,5 +525,163 @@ def test_mincut_uvvis():
         print('Epoch: {}    Loss: {:.4f}    Train MAE: {:.4f}    Val Loss: {:.4f}    Val MAE: {:.4f}'.format(epoch+1, np.mean(train_losses), np.mean(train_metrics), np.mean(val_losses), np.mean(val_metrics)))
 
 
+class ToyGatedModel(nn.Module):
+    
+    def __init__(self):
+        super(ToyGatedModel, self).__init__()
+        self.gc_1 = GatedGraphConv(in_features=121, out_features=64)
+        self.gc_2 = GatedGraphConv(in_features=64, out_features=64)
+        self.gc_3 = GatedGraphConv(in_features=64, out_features=64)
+        self.pooling = GlobalSumPooling()
+        self.linear = nn.Linear(64, 1)
+        self.relu = nn.ReLU()
 
-test_mincut_uvvis()
+    def forward(self, A, x, masks):
+        x1 = self.relu(self.gc_1(A, x))
+        # x = x * masks[:, :, :x.shape[-1]]
+        x2 = self.relu(self.gc_2(A, x1)) + x1
+        # x = x * masks[:, :, :x.shape[-1]]
+        x3 = self.relu(self.gc_3(A, x2)) + x2
+        # x = x * masks[:, :, :x.shape[-1]]
+        x = self.pooling(x3)
+        x = self.linear(x)
+        return x
+
+
+def test_gated_graph_conv():
+    n_train = 2048
+    n_val = 256
+    
+    train_uvvis = UVvis(masked=True)
+    train_uvvis.df = train_uvvis.df.iloc[:n_train, :]
+    mu, sigma = np.mean(train_uvvis.df['computational']), np.std(train_uvvis.df['computational'])
+    train_uvvis.df['computational'] = (train_uvvis.df['computational'] - mu) / sigma
+
+    val_uvvis = UVvis(masked=True)
+    val_uvvis.df = val_uvvis.df.iloc[n_train:n_train+n_val, :]
+    val_uvvis.df['computational'] = (val_uvvis.df['computational'] - mu) / sigma
+
+    train_loader = DataLoader(train_uvvis, batch_size=64)
+    val_loader = DataLoader(val_uvvis, batch_size=64)
+
+    model = ToyGatedModel()
+    optimizer = optim.Adam(model.parameters(), lr=0.00075)
+    MSE = nn.MSELoss()
+
+    print(model, '\n')
+
+    # gated = GatedGraphConv(121, 16)
+
+    # for idx, (A, x, masks, y_true) in enumerate(train_loader):
+    #     out = gated(A, x)
+    #     print('out', out.shape)
+    #     break
+
+    for epoch in range(256):
+        train_losses = []
+        train_metrics = []
+        model.train()
+        for idx, (A, x, masks, y_true) in enumerate(train_loader):
+            optimizer.zero_grad()
+            y_pred = model(A, x, masks)
+            loss = MSE(y_true, y_pred)
+            train_losses.append(loss.item())
+            y_pred = (y_pred * sigma) + mu
+            y_true = (y_true * sigma) + mu
+            train_metrics.append(nn.L1Loss()(y_true, y_pred).item())
+            loss.backward()
+            optimizer.step()
+        #     break
+        # break
+
+        val_losses = []
+        val_metrics = []
+        model.eval()
+        for idx, (A, x, masks, y_true) in enumerate(val_loader):
+            y_pred = model(A, x, masks)
+            y_pred = (y_pred * sigma) + mu
+            y_true = (y_true * sigma) + mu
+            val_losses.append(MSE(y_true, y_pred).item())
+            val_metrics.append(nn.L1Loss()(y_true, y_pred).item())
+        
+        print('Epoch: {}    Loss: {:.4f}    Train MAE: {:.4f}    Val Loss: {:.4f}    Val MAE: {:.4f}'.format(epoch+1, np.mean(train_losses), np.mean(train_metrics), np.mean(val_losses), np.mean(val_metrics)))
+
+
+class ToyGraphSAGEModel(nn.Module):
+    
+    def __init__(self):
+        super(ToyGraphSAGEModel, self).__init__()
+        self.gc1 = GraphSAGE(in_features=121, out_features=64)
+        self.gc2 = GraphSAGE(in_features=64, out_features=64)
+        self.gc3 = GraphSAGE(in_features=64, out_features=64)
+        self.pooling = GlobalSumPooling()
+        self.linear = nn.Linear(64, 1)
+        self.relu = nn.ReLU()
+
+    def forward(self, A, x, masks):
+        x = self.relu(self.gc1(A, x))
+        x = x * masks[:, :, :x.shape[-1]]
+        x = self.relu(self.gc2(A, x))
+        x = x * masks[:, :, :x.shape[-1]]
+        x = self.relu(self.gc3(A, x))
+        x = x * masks[:, :, :x.shape[-1]]
+
+        x = self.pooling(x)
+        x = self.linear(x)
+        return x
+
+
+def test_graphsage():
+    n_train = 1024
+    n_val = 256
+    
+    train_uvvis = UVvis(masked=True)
+    train_uvvis.df = train_uvvis.df.iloc[:n_train, :]
+    mu, sigma = np.mean(train_uvvis.df['computational']), np.std(train_uvvis.df['computational'])
+    train_uvvis.df['computational'] = (train_uvvis.df['computational'] - mu) / sigma
+
+    val_uvvis = UVvis(masked=True)
+    val_uvvis.df = val_uvvis.df.iloc[n_train:n_train+n_val, :]
+    val_uvvis.df['computational'] = (val_uvvis.df['computational'] - mu) / sigma
+
+    train_loader = DataLoader(train_uvvis, batch_size=64)
+    val_loader = DataLoader(val_uvvis, batch_size=64)
+
+    model = ToyGraphSAGEModel()
+    optimizer = optim.Adam(model.parameters())
+    MSE = nn.MSELoss()
+
+    print(model, '\n')
+
+    for epoch in range(256):
+        train_losses = []
+        train_metrics = []
+        model.train()
+        for idx, (A, x, masks, y_true) in enumerate(train_loader):
+            optimizer.zero_grad()
+            y_pred = model(A, x, masks)
+            loss = MSE(y_true, y_pred)
+            train_losses.append(loss.item())
+            y_pred = (y_pred * sigma) + mu
+            y_true = (y_true * sigma) + mu
+            train_metrics.append(nn.L1Loss()(y_true, y_pred).item())
+            loss.backward()
+            optimizer.step()
+        #     break
+        # break
+
+        val_losses = []
+        val_metrics = []
+        model.eval()
+        for idx, (A, x, masks, y_true) in enumerate(val_loader):
+            y_pred = model(A, x, masks)
+            y_pred = (y_pred * sigma) + mu
+            y_true = (y_true * sigma) + mu
+            val_losses.append(MSE(y_true, y_pred).item())
+            val_metrics.append(nn.L1Loss()(y_true, y_pred).item())
+        
+        print('Epoch: {}    Loss: {:.4f}    Train MAE: {:.4f}    Val Loss: {:.4f}    Val MAE: {:.4f}'.format(epoch+1, np.mean(train_losses), np.mean(train_metrics), np.mean(val_losses), np.mean(val_metrics)))
+
+
+
+test_graphsage()

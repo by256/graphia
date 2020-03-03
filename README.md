@@ -5,7 +5,9 @@ Library of graph neural network implementations in PyTorch.
 
 GNN Layers:
 - Graph Convolutional Network (SpectralGraphConv) - [Kipf and Welling, 2017](https://arxiv.org/abs/1609.02907)
+- GraphSAGE - [Hamilton and Ying et al., 2018](https://arxiv.org/abs/1706.02216)
 - Graph Attention Network (GAT and MultiHeadGAT) - [Veličković et al., 2018](https://arxiv.org/abs/1710.10903)
+- Residual Gated Graph ConvNets (GatedGraphConv) - [Bresson and Laurent, 2018](https://arxiv.org/abs/1711.07553)
 - Graph Isomorphism Network (GIN) - [Xu and Hu et al., 2019](https://arxiv.org/abs/1810.00826)
 - Convolutional ARMA Filters (ARMAConv) - [Bianchi et al., 2019](https://arxiv.org/abs/1901.01343)
 
