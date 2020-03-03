@@ -14,11 +14,13 @@ GNN Layers:
 Pooling:
 - Global Sum/Ave/Max Pooling
 - DiffPool - [Ying et al., 2019](https://arxiv.org/abs/1806.08804)
-- MinCut Pooling - [Bianchi and Grattarola et al., 2019](https://arxiv.org/abs/1907.00481)
+- MinCutPooling - [Bianchi and Grattarola et al., 2019](https://arxiv.org/abs/1907.00481)
+- TopKPooling - [Cangea et al., 2018](https://arxiv.org/abs/1811.01287) and [Gao and Ji, 2019](https://arxiv.org/abs/1905.05178)
+
 
 ## Example Usage
 
-To use graphia's GNN layers, simply import the layers you want to use and define a PyTorch model as you usually would. Below is an example of a graph neural network that maps an input graph with node dimensions $N \times 32$ to a scalar real-valued output.
+To use graphia's GNN layers, simply import the layers you want to use and define a PyTorch model as you usually would. Below is an example of a graph neural network that maps an input graph with node dimensions N x 32 to a scalar real-valued output.
 
 ```python
 import torch.nn as nn

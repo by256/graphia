@@ -8,9 +8,8 @@ from torch.utils.data import DataLoader
 
 from utils import degree_matrix
 from datasets import Cora, UVvis
-from pooling import GlobalMaxPooling, GlobalSumPooling, GlobalAvePooling, DiffPool, MinCutPooling
 from layers import SpectralGraphConv, GAT, MultiHeadGAT, GIN, ARMAConv, GatedGraphConv, GraphSAGE
-
+from pooling import GlobalMaxPooling, GlobalSumPooling, GlobalAvePooling, DiffPool, MinCutPooling, TopKPooling
 
 
 def test_uvvis_dataset():
@@ -614,7 +613,7 @@ class ToyGraphSAGEModel(nn.Module):
         self.gc1 = GraphSAGE(in_features=121, out_features=64)
         self.gc2 = GraphSAGE(in_features=64, out_features=64)
         self.gc3 = GraphSAGE(in_features=64, out_features=64)
-        self.pooling = GlobalSumPooling()
+        self.pooling = GlobalMaxPooling()
         self.linear = nn.Linear(64, 1)
         self.relu = nn.ReLU()
 
@@ -683,5 +682,88 @@ def test_graphsage():
         print('Epoch: {}    Loss: {:.4f}    Train MAE: {:.4f}    Val Loss: {:.4f}    Val MAE: {:.4f}'.format(epoch+1, np.mean(train_losses), np.mean(train_metrics), np.mean(val_losses), np.mean(val_metrics)))
 
 
+class ToyTopKModel(nn.Module):
+    
+    def __init__(self):
+        super(ToyTopKModel, self).__init__()
+        self.gc1 = GIN(in_features=121, out_features=64)
+        self.gc2 = GIN(in_features=64, out_features=64)
+        self.gc3 = GIN(in_features=64, out_features=64)
+        self.pool1 = TopKPooling(64, k=32)
+        self.pool2 = TopKPooling(64, k=16)
+        self.pool3 = TopKPooling(64, k=8)
+        self.readout = GlobalMaxPooling()
+        self.linear = nn.Linear(64, 1)
+        self.relu = nn.ReLU()
 
-test_graphsage()
+    def forward(self, A, x, masks):
+        x = self.relu(self.gc1(A, x))
+        x = x * masks[:, :, :x.shape[-1]]
+        A, x = self.pool1(A, x)
+        
+        x = self.relu(self.gc2(A, x))
+        A, x = self.pool2(A, x)
+
+        x = self.relu(self.gc3(A, x))
+        A, x = self.pool3(A, x)
+
+        x = self.readout(x)
+        x = self.linear(x)
+        return x
+
+
+def test_topk_pooling():
+    n_train = 1024
+    n_val = 256
+    
+    train_uvvis = UVvis(masked=True)
+    train_uvvis.df = train_uvvis.df.iloc[:n_train, :]
+    mu, sigma = np.mean(train_uvvis.df['computational']), np.std(train_uvvis.df['computational'])
+    train_uvvis.df['computational'] = (train_uvvis.df['computational'] - mu) / sigma
+
+    val_uvvis = UVvis(masked=True)
+    val_uvvis.df = val_uvvis.df.iloc[n_train:n_train+n_val, :]
+    val_uvvis.df['computational'] = (val_uvvis.df['computational'] - mu) / sigma
+
+    train_loader = DataLoader(train_uvvis, batch_size=64)
+    val_loader = DataLoader(val_uvvis, batch_size=64)
+
+    model = ToyTopKModel()
+    optimizer = optim.Adam(model.parameters(), lr=0.005)
+    MSE = nn.MSELoss()
+
+    print(model, '\n')
+
+    for epoch in range(256):
+        train_losses = []
+        train_metrics = []
+        model.train()
+        for idx, (A, x, masks, y_true) in enumerate(train_loader):
+            optimizer.zero_grad()
+            y_pred = model(A, x, masks)
+            loss = MSE(y_true, y_pred)
+            train_losses.append(loss.item())
+            y_pred = (y_pred * sigma) + mu
+            y_true = (y_true * sigma) + mu
+            train_metrics.append(nn.L1Loss()(y_true, y_pred).item())
+            loss.backward()
+            optimizer.step()
+        #     break
+        # break
+
+        val_losses = []
+        val_metrics = []
+        model.eval()
+        for idx, (A, x, masks, y_true) in enumerate(val_loader):
+            y_pred = model(A, x, masks)
+            y_pred = (y_pred * sigma) + mu
+            y_true = (y_true * sigma) + mu
+            val_losses.append(MSE(y_true, y_pred).item())
+            val_metrics.append(nn.L1Loss()(y_true, y_pred).item())
+        
+        print('Epoch: {}    Loss: {:.4f}    Train MAE: {:.4f}    Val Loss: {:.4f}    Val MAE: {:.4f}'.format(epoch+1, np.mean(train_losses), np.mean(train_metrics), np.mean(val_losses), np.mean(val_metrics)))
+
+
+
+
+test_topk_pooling()

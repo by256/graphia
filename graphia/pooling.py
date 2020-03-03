@@ -125,3 +125,34 @@ class MinCutPooling(nn.Module):
 
     def unsupervised_loss(self):
         raise NotImplementedError
+
+
+class TopKPooling(nn.Module):
+    """
+    (Cangea et al., 2018) and (Gao and Ji, 2019)'s TopK Pooling layer from 
+    (https://arxiv.org/abs/1811.01287) and (https://arxiv.org/abs/1905.05178) respectively.
+
+    Args:
+        in_features (int): Number of features in each node of the input node feature matrix.
+        k (int): Number of of nodes to keep in the reduced graph.
+
+    Attributes:
+        p (torch.nn.Parameter): Projection score learnable parameter vector.
+    """
+    def __init__(self, in_features, k):
+        super(TopKPooling, self).__init__()
+        self.in_features = in_features
+        self.k = k
+        self.p = torch.nn.Parameter(torch.randn(self.in_features, 1), requires_grad=True)
+        nn.init.xavier_normal_(self.p.data)
+
+    def forward(self, A, x):
+        y = torch.matmul(x, self.p) / (torch.norm(self.p) + 1e-7)
+        topk_idx = torch.topk(y, k=self.k, dim=1)[1]
+
+        A_out = torch.gather(A, dim=1, index=topk_idx.repeat(1, 1, A.shape[-1]))
+        A_out = torch.gather(A_out, dim=2, index=topk_idx.repeat(1, 1, self.k).permute(0, 2, 1))
+        x = x * torch.tanh(y)
+        x_out = torch.gather(x, dim=1, index=topk_idx.repeat(1, 1, x.shape[-1]))
+        return A_out, x_out
+
