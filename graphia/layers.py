@@ -66,11 +66,15 @@ class GAT(nn.Module):
         a = self.masked_softmax(a, A, dim=2)
         return torch.matmul(a, Wh)
 
-    def masked_softmax(self, x, A, dim=3, epsilon=1e-5):
+    def masked_softmax(self, x, A, dim=2):
+        x = x - torch.max(x, dim=-1, keepdim=True)[0] # for numerical stability
         exps = torch.exp(x)
         masked_exps = exps * A.float()
-        masked_sums = masked_exps.sum(dim, keepdim=True) + epsilon
-        return (masked_exps / masked_sums)
+        masked_sums = masked_exps.sum(dim=dim, keepdim=True) 
+        diag = torch.diagonal(A, dim1=1, dim2=2).unsqueeze(dim=-1)
+        masked_sums = masked_sums + (1 - diag)
+
+        return (masked_exps / masked_sums) * A.float()
 
 
 class MultiHeadGAT(nn.Module):
