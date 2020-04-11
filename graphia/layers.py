@@ -63,7 +63,7 @@ class GAT(nn.Module):
         B, N = x.shape[0], x.shape[1]
         Wh_concat = torch.cat([Wh.view(B, N, 1, -1).repeat(1, 1, N, 1), Wh.view(B, 1, N, -1).repeat(1, N, 1, 1)], dim=-1)  # B x N x N x 2F_prime
         a = F.leaky_relu(self.attention_mechanism(Wh_concat), negative_slope=0.2).squeeze()
-        a = self.masked_softmax(a, A, dim=1)
+        a = self.masked_softmax(a, A, dim=2)
         return torch.matmul(a, Wh)
 
     def masked_softmax(self, x, A, dim=3, epsilon=1e-5):
